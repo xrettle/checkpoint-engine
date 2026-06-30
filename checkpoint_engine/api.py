@@ -3,11 +3,12 @@ from typing import Any
 
 import fastapi
 import httpx
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from loguru import logger
 from pydantic import BaseModel
 
+from checkpoint_engine.data_types import MemoryBufferMetaList
 from checkpoint_engine.ps import ParameterServer
 
 
@@ -78,6 +79,18 @@ def _init_api(ps: ParameterServer) -> Any:
     @app.post("/v1/checkpoints/{checkpoint_name}/gather-metas")
     async def gather_metas(checkpoint_name: str) -> Response:
         return wrap_exception(lambda: ps.gather_metas(checkpoint_name))
+
+    @app.get("/v1/metas")
+    async def get_metas() -> dict[int, MemoryBufferMetaList]:
+        try:
+            return ps.get_metas()
+        except Exception as e:
+            logger.exception("get_metas failed")
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    @app.post("/v1/metas")
+    async def load_metas(metas: dict[int, MemoryBufferMetaList]) -> Response:
+        return wrap_exception(lambda: ps.load_metas(metas))
 
     @app.post("/v1/checkpoints/{checkpoint_name}/update")
     async def update(checkpoint_name: str, req: UpdateRequest) -> Response:
